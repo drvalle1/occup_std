@@ -7,11 +7,12 @@ gibbs_occup=function(y,xmat.occ,xmat.det,tau2.a,tau2.b,
   nparam.occ=ncol(xmat.occ)
   nparam.det=ncol(xmat.det[,,1])
   ystar=y
-  ystar=ifelse(y==1,1,-1)
+  cond=!is.na(y) & y==1; ystar[cond]=1
+  cond=!is.na(y) & y==0; ystar[cond]=-1
   m.betas=rep(0,nparam.occ)
   tau2.betas=rep(1,nparam.occ)
   betas=matrix(0,nparam.occ,nspp)
-  z=apply(y,c(1,2),max)
+  z=apply(y,c(1,2),max,na.rm=T)
   zstar=matrix(ifelse(z==1,1,-1),nloc,nspp)
   m.gamma=rep(0,nparam.det)
   tau2.gamma=rep(1,nparam.det)

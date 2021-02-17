@@ -28,7 +28,7 @@ sample.z=function(xmat.occ,betas,nloc,nspp,nrep,y,xmat.det,gammas){
   
   #sample z
   z=matrix(1,nloc,nspp)
-  max.y=apply(y,c(1,2),max)
+  max.y=apply(y,c(1,2),max,na.rm=T)
   cond=max.y==0
   z[cond]=rbinom(sum(cond),size=1,prob=prob.fim[cond])
   z
@@ -46,9 +46,12 @@ sample.ystar=function(nrep,xmat.det,gammas,y,nnloc,nspp){
   ystar=y
   for (j in 1:nrep){
     media=xmat.det[,,j]%*%gammas
-    lo.mat=matrix(ifelse(y[,,j]==1,0,-1000),nloc,nspp)
-    hi.mat=matrix(ifelse(y[,,j]==0,0, 1000),nloc,nspp)
-    ystar[,,j]=tnorm(n=nloc*nspp,lo=lo.mat,hi=hi.mat,mu=media,sig=1)
+    y1=y[,,j]
+    lo.mat=matrix(ifelse(!is.na(y1) & y1==1,0,-1000),nloc,nspp)
+    hi.mat=matrix(ifelse(!is.na(y1) & y1==0,0, 1000),nloc,nspp)
+    tmp=tnorm(n=nloc*nspp,lo=lo.mat,hi=hi.mat,mu=media,sig=1)
+    tmp[is.na(y1)]=NA
+    ystar[,,j]=tmp
   }
   ystar
 }
@@ -84,9 +87,13 @@ sample.gammas=function(ystar,xmat.det,z,m.gamma,tau2.gamma,nparam.det,nspp,nrep)
         ystar1=c(ystar1,ystar[cond,i,j])
       }
     }
-    xtx=t(xmat.det1)%*%xmat.det1    
+    cond=!is.na(ystar1)
+    ystar2=ystar1[cond]
+    xmat.det2=xmat.det1[cond,]
+    
+    xtx=t(xmat.det2)%*%xmat.det2    
     var1=solve(xtx+invTau)
-    pmedia1=t(xmat.det1)%*%ystar1+invTau%*%m.gamma
+    pmedia1=t(xmat.det2)%*%ystar2+invTau%*%m.gamma
     gammas[,i]=rmvnorm(1,var1%*%pmedia1,var1)
   }
   gammas
@@ -130,18 +137,25 @@ get.llk=function(nloc,nspp,betas,xmat.occ,y,gammas,xmat.det){
   for (i in 1:nspp){
     lprob=rep(NA,nloc)
     y1=y[,i,]
-    tmp=rowSums(y1)
+    tmp=rowSums(y1,na.rm=T)
     
     #all observations are equal to zero
     cond=tmp==0
+    One_Phi.det1=One_Phi.det[cond,i,]
+    
+    #to deal with the fact that some y's are equal to NA
+    y2=y1[cond,]
+    cond1=is.na(y2)
+    One_Phi.det1[cond1]=NA
+    
     # lp1=rowSums(log(One_Phi.det[cond,i,]))+log(Phi.occ[cond,i])
-    p1=apply(One_Phi.det[cond,i,],1,prod)*Phi.occ[cond,i]
+    p1=apply(One_Phi.det1,1,prod,na.rm=T)*Phi.occ[cond,i]
     p2=One_Phi.occ[cond,i]
     lprob[cond]=log(p1+p2)
     
     #at least one observations is equal to 1
     lp1=y1[!cond,]*lPhi.det[!cond,i,]+(1-y1[!cond,])*lOne_Phi.det[!cond,i,]
-    lp2=rowSums(lp1)+lPhi.occ[!cond,i]
+    lp2=rowSums(lp1,na.rm=T)+lPhi.occ[!cond,i]
     lprob[!cond]=lp2
     fim[i]=sum(lprob)
   }
